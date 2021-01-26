@@ -73,6 +73,7 @@ fn run_example(servo_media: Arc<ServoMedia>) {
         None,
         Some(audio_renderer),
         Box::new(PlayerContextDummy()),
+        None,
     );
 
     let filename = "./examples/resources/viper_cut.ogg";

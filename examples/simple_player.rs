@@ -57,6 +57,7 @@ fn run_example(servo_media: Arc<ServoMedia>) {
         None,
         None,
         Box::new(PlayerContextDummy()),
+        None,
     );
 
     let path = Path::new(filename);

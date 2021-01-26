@@ -33,6 +33,7 @@ fn run_example(servo_media: Arc<ServoMedia>) {
         None,
         None,
         Box::new(PlayerContextDummy()),
+        None,
     );
 
     let audio_stream = servo_media.create_audiostream();

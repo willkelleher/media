@@ -20,6 +20,7 @@ let player = servo_media.create_player(
     None,
     None,
     Box::new(PlayerContextDummy()),
+    None,
 );
 
 // Open file and set input size.

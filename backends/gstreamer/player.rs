@@ -368,6 +368,8 @@ pub struct GStreamerPlayer {
     stream_type: StreamType,
     /// Decorator used to setup the video sink and process the produced frames.
     render: Arc<Mutex<GStreamerRender>>,
+    /// Optional UWP dispatcher
+    dispatcher: Option<usize>,
 }
 
 impl GStreamerPlayer {
@@ -380,6 +382,7 @@ impl GStreamerPlayer {
         video_renderer: Option<Arc<Mutex<dyn VideoFrameRenderer>>>,
         audio_renderer: Option<Arc<Mutex<dyn AudioRenderer>>>,
         gl_context: Box<dyn PlayerGLContext>,
+        dispatcher: Option<usize>,
     ) -> GStreamerPlayer {
         let _ = gst::DebugCategory::new(
             "servoplayer",
@@ -398,6 +401,7 @@ impl GStreamerPlayer {
             is_ready: Arc::new(Once::new()),
             stream_type,
             render: Arc::new(Mutex::new(GStreamerRender::new(gl_context))),
+            dispatcher,
         }
     }
 
@@ -508,6 +512,17 @@ impl GStreamerPlayer {
                     })
                     .build(),
             );
+        } else if let Some(disp) = self.dispatcher {
+            // We'll explicitly create the audio sink here so we can set the dispatcher.
+            // This really only applies to UWP
+            let audio_sink = gst::ElementFactory::make("wasapi2sink", None)
+                .map_err(|_| PlayerError::Backend("appsink creation failed".to_owned()))?;
+            audio_sink
+                .set_property("dispatcher", &(disp as u64))
+                .expect("failed to set wasapi2sink dispatcher");
+            pipeline
+                .set_property("audio-sink", &audio_sink)
+                .expect("playbin doesn't have expected 'audio-sink' property");
         }
 
         let video_sink = self.render.lock().unwrap().setup_video_sink(&pipeline)?;

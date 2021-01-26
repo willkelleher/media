@@ -193,6 +193,7 @@ impl App {
             renderer,
             None,
             Box::new(PlayerContextGlutin::new(opts.use_gl, &windowed_context)),
+            None,
         );
 
         player
