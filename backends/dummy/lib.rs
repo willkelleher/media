@@ -88,6 +88,7 @@ impl Backend for DummyBackend {
         _: Option<Arc<Mutex<dyn video::VideoFrameRenderer>>>,
         _: Option<Arc<Mutex<dyn audio::AudioRenderer>>>,
         _: Box<dyn PlayerGLContext>,
+        _: Option<usize>,
     ) -> Arc<Mutex<dyn Player>> {
         Arc::new(Mutex::new(DummyPlayer))
     }

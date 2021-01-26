@@ -31,6 +31,10 @@ impl PlayerGLContext for PlayerContextDummy {
     fn get_gl_api(&self) -> GlApi {
         return GlApi::None;
     }
+
+    fn get_dispatcher(&self) -> Option<usize> {
+        return None;
+    }
 }
 
 fn run_example(servo_media: Arc<ServoMedia>) {
@@ -73,6 +77,7 @@ fn run_example(servo_media: Arc<ServoMedia>) {
         None,
         Some(audio_renderer),
         Box::new(PlayerContextDummy()),
+        None,
     );
 
     let filename = "./examples/resources/viper_cut.ogg";

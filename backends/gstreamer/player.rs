@@ -2,6 +2,7 @@ use super::BACKEND_BASE_TIME;
 use byte_slice_cast::AsSliceOf;
 use glib;
 use glib::prelude::*;
+use glib::translate::*;
 use gst;
 use gst::prelude::*;
 use gst_app;
@@ -368,6 +369,8 @@ pub struct GStreamerPlayer {
     stream_type: StreamType,
     /// Decorator used to setup the video sink and process the produced frames.
     render: Arc<Mutex<GStreamerRender>>,
+    /// Optional UWP dispatcher
+    dispatcher: Option<usize>,
 }
 
 impl GStreamerPlayer {
@@ -387,6 +390,8 @@ impl GStreamerPlayer {
             Some("Servo player"),
         );
 
+        let dispatcher = gl_context.get_dispatcher();
+
         Self {
             id,
             context_id: *context_id,
@@ -398,6 +403,7 @@ impl GStreamerPlayer {
             is_ready: Arc::new(Once::new()),
             stream_type,
             render: Arc::new(Mutex::new(GStreamerRender::new(gl_context))),
+            dispatcher,
         }
     }
 
@@ -508,6 +514,24 @@ impl GStreamerPlayer {
                     })
                     .build(),
             );
+        } else if let Some(disp) = self.dispatcher {
+            // We'll explicitly create the audio sink here so we can set the dispatcher.
+            // This really only applies to UWP
+            let audio_sink = gst::ElementFactory::make("wasapi2sink", None)
+                .map_err(|_| PlayerError::Backend("appsink creation failed".to_owned()))?;
+            unsafe {
+                let mut val = glib::Value::from_type(glib::Type::Pointer);
+                gobject_ffi::g_value_set_pointer(
+                    val.to_glib_none_mut().0,
+                    (disp as glib_ffi::gpointer),
+                );
+                audio_sink
+                    .set_property("dispatcher", &val)
+                    .expect("failed to set wasapi2sink dispatcher");
+            }
+            pipeline
+                .set_property("audio-sink", &audio_sink)
+                .expect("playbin doesn't have expected 'audio-sink' property");
         }
 
         let video_sink = self.render.lock().unwrap().setup_video_sink(&pipeline)?;

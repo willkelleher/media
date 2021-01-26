@@ -105,4 +105,8 @@ impl PlayerGLContext for PlayerContextGlutin {
     fn get_gl_api(&self) -> GlApi {
         self.gl_api.clone()
     }
+
+    fn get_dispatcher(&self) -> Option<usize> {
+        return None;
+    }
 }
