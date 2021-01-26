@@ -50,4 +50,6 @@ pub trait PlayerGLContext {
     fn get_native_display(&self) -> NativeDisplay;
     /// Returns the GL API of the context
     fn get_gl_api(&self) -> GlApi;
+    // Returns the optional platform dispatcher handle
+    fn get_dispatcher(&self) -> Option<usize>;
 }

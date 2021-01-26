@@ -2,6 +2,7 @@ use super::BACKEND_BASE_TIME;
 use byte_slice_cast::AsSliceOf;
 use glib;
 use glib::prelude::*;
+use glib::translate::*;
 use gst;
 use gst::prelude::*;
 use gst_app;
@@ -382,13 +383,14 @@ impl GStreamerPlayer {
         video_renderer: Option<Arc<Mutex<dyn VideoFrameRenderer>>>,
         audio_renderer: Option<Arc<Mutex<dyn AudioRenderer>>>,
         gl_context: Box<dyn PlayerGLContext>,
-        dispatcher: Option<usize>,
     ) -> GStreamerPlayer {
         let _ = gst::DebugCategory::new(
             "servoplayer",
             gst::DebugColorFlags::empty(),
             Some("Servo player"),
         );
+
+        let dispatcher = gl_context.get_dispatcher();
 
         Self {
             id,
@@ -517,9 +519,16 @@ impl GStreamerPlayer {
             // This really only applies to UWP
             let audio_sink = gst::ElementFactory::make("wasapi2sink", None)
                 .map_err(|_| PlayerError::Backend("appsink creation failed".to_owned()))?;
-            audio_sink
-                .set_property("dispatcher", &(disp as u64))
-                .expect("failed to set wasapi2sink dispatcher");
+            unsafe {
+                let mut val = glib::Value::from_type(glib::Type::Pointer);
+                gobject_ffi::g_value_set_pointer(
+                    val.to_glib_none_mut().0,
+                    (disp as glib_ffi::gpointer),
+                );
+                audio_sink
+                    .set_property("dispatcher", &val)
+                    .expect("failed to set wasapi2sink dispatcher");
+            }
             pipeline
                 .set_property("audio-sink", &audio_sink)
                 .expect("playbin doesn't have expected 'audio-sink' property");

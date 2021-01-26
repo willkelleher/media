@@ -39,7 +39,6 @@ pub trait Backend: Send + Sync {
         video_renderer: Option<Arc<Mutex<dyn VideoFrameRenderer>>>,
         audio_renderer: Option<Arc<Mutex<dyn AudioRenderer>>>,
         gl_context: Box<dyn PlayerGLContext>,
-        dispatcher: Option<usize>,
     ) -> Arc<Mutex<dyn Player>>;
     fn create_audiostream(&self) -> MediaStreamId;
     fn create_videostream(&self) -> MediaStreamId;

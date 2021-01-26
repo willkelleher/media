@@ -25,6 +25,10 @@ impl PlayerGLContext for PlayerContextDummy {
     fn get_gl_api(&self) -> GlApi {
         return GlApi::None;
     }
+
+    fn get_dispatcher(&self) -> Option<usize> {
+        return None;
+    }
 }
 
 fn run_example(servo_media: Arc<ServoMedia>) {
