@@ -49,6 +49,7 @@ pub mod webrtc;
 
 use device_monitor::GStreamerDeviceMonitor;
 use gst::ClockExt;
+use gst::PluginFeatureExtManual;
 use ipc_channel::ipc::IpcSender;
 use media_stream::GStreamerMediaStream;
 use mime::Mime;
@@ -113,6 +114,13 @@ impl GStreamerBackend {
 
         if !errors.is_empty() {
             return Err(ErrorLoadingPlugins(errors));
+        }
+
+        // Reduce rank of avdec_h264 since it takes priority over d3d11 impl
+        let registry = gst::Registry::get();
+        let avdec_h264 = registry.lookup_feature("avdec_h264");
+        if let Some(feat) = avdec_h264 {
+            feat.set_rank(gst::Rank::Marginal);
         }
 
         let instances: Arc<
