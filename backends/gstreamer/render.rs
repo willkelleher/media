@@ -150,18 +150,21 @@ impl GStreamerRender {
         if let Some(render) = self.render.as_ref() {
             render.build_video_sink(&appsink, pipeline)?
         } else {
-            let caps = gst::Caps::builder("video/x-raw")
-                .field("format", &gst_video::VideoFormat::Bgra.to_string())
-                .field("pixel-aspect-ratio", &gst::Fraction::from((1, 1)))
-                .build();
+            return Err(PlayerError::Backend(
+                "Trying to use default backend".to_owned(),
+            ));
+            // let caps = gst::Caps::builder("video/x-raw")
+            //     .field("format", &gst_video::VideoFormat::Bgra.to_string())
+            //     .field("pixel-aspect-ratio", &gst::Fraction::from((1, 1)))
+            //     .build();
 
-            appsink
-                .set_property("caps", &caps)
-                .expect("appsink doesn't have expected 'caps' property");
+            // appsink
+            //     .set_property("caps", &caps)
+            //     .expect("appsink doesn't have expected 'caps' property");
 
-            pipeline
-                .set_property("video-sink", &appsink)
-                .expect("playbin doesn't have expected 'video-sink' property");
+            // pipeline
+            //     .set_property("video-sink", &appsink)
+            //     .expect("playbin doesn't have expected 'video-sink' property");
         };
 
         let appsink = appsink.dynamic_cast::<gst_app::AppSink>().unwrap();
