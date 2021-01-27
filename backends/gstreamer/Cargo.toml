@@ -93,3 +93,6 @@ servo-media-gstreamer-render-unix = { path = "render-unix", features = ["gl-egl"
 
 [target.'cfg(target_os = "android")'.dependencies]
 servo-media-gstreamer-render-android = { path = "render-android" }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+servo-media-gstreamer-render-uwp = { path = "render-uwp", features = ["gl-egl"] }

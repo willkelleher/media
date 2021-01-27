@@ -1,5 +1,6 @@
 use glib::prelude::*;
 use gst;
+use gst::prelude::*;
 use gst_app;
 use gst_video;
 
@@ -39,6 +40,18 @@ mod platform {
         Render::new(gl_context)
     }
 }
+
+// #[cfg(target_os = "windows")]
+// mod platform {
+//     extern crate servo_media_gstreamer_render_uwp;
+//     pub use self::servo_media_gstreamer_render_uwp::RenderUWP as Render;
+
+//     use super::*;
+
+//     pub fn create_render(gl_context: Box<dyn PlayerGLContext>) -> Option<Render> {
+//         Render::new(gl_context)
+//     }
+// }
 
 #[cfg(not(any(
     target_os = "linux",
@@ -146,8 +159,31 @@ impl GStreamerRender {
                 .set_property("caps", &caps)
                 .expect("appsink doesn't have expected 'caps' property");
 
+            // We need to make a custom bin that will download from D3D memory
+            // and then feed the result to glvideosink.
+
+            let d3dglsink = gst::Bin::new(Some("d3d-gl-sink"));
+
+            let convert = gst::ElementFactory::make("d3d11convert", None)
+                .map_err(|_| PlayerError::Backend("d3d11convert creation failed".to_owned()))?;
+
+            let download = gst::ElementFactory::make("d3d11download", None)
+                .map_err(|_| PlayerError::Backend("d3d11download creation failed".to_owned()))?;
+
+            d3dglsink.add_many(&[&convert, &download, &appsink])
+                .map_err(|e| PlayerError::Backend("Failed to add elements to d3dglsink".to_owned()))?;
+
+            convert.link(&download)
+                .expect("Failed to link d3d11convert -> d3d11download");
+
+            download.link(&appsink)
+                .expect("Failed to link d3d11download -> appsink");
+
+            let sink_pad = gst::GhostPad::new(Some("sink"), &convert.get_static_pad("sink").unwrap()).unwrap();
+            d3dglsink.add_pad(&sink_pad);
+
             pipeline
-                .set_property("video-sink", &appsink)
+                .set_property("video-sink", &d3dglsink)
                 .expect("playbin doesn't have expected 'video-sink' property");
         };
 
