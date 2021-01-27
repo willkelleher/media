@@ -76,10 +76,11 @@ impl RenderUWP {
         let (wrapped_context, display) = match gl_context {
             GlContext::Egl(context) => {
                 let display = match display_native {
-                    #[cfg(feature = "gl-egl")]
                     NativeDisplay::Egl(display_native) => {
                         unsafe { gst_gl::GLDisplayEGL::new_with_egl_display(display_native) }
-                            .and_then(|display| Ok(display.upcast()))
+                            .and_then(|display| {
+                                Ok(display.upcast())
+                            })
                             .ok()
                     }
                     _ => None,
@@ -203,20 +204,26 @@ impl Render for RenderUWP {
 
         let download = gst::ElementFactory::make("d3d11download", None)
             .map_err(|_| PlayerError::Backend("d3d11download creation failed".to_owned()))?;
-        let upload = gst::ElementFactory::make("glupload", None)
-            .map_err(|_| PlayerError::Backend("glupload creation failed".to_owned()))?;
+
+        let vsinkbin = gst::ElementFactory::make("glsinkbin", Some("servo-media-vsink"))
+            .map_err(|_| PlayerError::Backend("glsinkbin creation failed".to_owned()))?;
 
         pipeline
             .dynamic_cast_ref::<gst::Pipeline>()
             .unwrap()
-            .add_many(&[&download, &upload])
-            .map_err(|e| PlayerError::Backend("Failed to add download/upload elements".to_owned()))?;
+            .add_many(&[&vsinkbin, &download])
+            .map_err(|e| PlayerError::Backend("Failed to add element".to_owned()))?;
 
-        let vsinkbin = gst::ElementFactory::make("glsinkbin", Some("servo-media-vsink"))
-            .map_err(|_| PlayerError::Backend("glupload creation failed".to_owned()))?;
+        pipeline
+            .set_property("video-sink", &download)
+            .expect("playbin doesn't have expected 'video-sink' property");
 
-        gst::Element::link_many(&[&download, &upload, &vsinkbin])
-            .expect("Failed to link d3d11download -> glupload -> glsinkbin");
+        let intermediate_caps = gst::Caps::builder("video/x-raw")
+            .field("format", &gst_video::VideoFormat::Rgba.to_string())
+            .build();
+
+        download.link_filtered(&vsinkbin, Some(&intermediate_caps))
+            .expect("Failed to link d3d11download -> glsinkbin");
 
         let caps = gst::Caps::builder("video/x-raw")
             .features(&[&gst_gl::CAPS_FEATURE_MEMORY_GL_MEMORY])
@@ -230,10 +237,6 @@ impl Render for RenderUWP {
         vsinkbin
             .set_property("sink", &appsink)
             .expect("glsinkbin doesn't have expected 'sink' property");
-
-        pipeline
-            .set_property("video-sink", &download)
-            .expect("playbin doesn't have expected 'video-sink' property");
 
         let bus = pipeline.get_bus().expect("pipeline with no bus");
         let display_ = self.display.clone();
