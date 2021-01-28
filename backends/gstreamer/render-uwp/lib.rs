@@ -202,41 +202,43 @@ impl Render for RenderUWP {
             ));
         }
 
+        let caps = gst::Caps::builder("video/x-raw")
+            .features(&[&gst_gl::CAPS_FEATURE_MEMORY_GL_MEMORY])
+            .field("format", &gst_video::VideoFormat::Rgba.to_string())
+            .field("texture-target", &gst::List::new(&[&"2D", &"external-oes"]))
+            .build();
+            
+        appsink
+            .set_property("caps", &caps)
+            .expect("appsink doesn't have expected 'caps' property");
+
+        // We need to make a custom bin that will download from D3D memory
+        // and then feed the result to glvideosink.
+
+        let d3dglsink = gst::Bin::new(Some("d3d-gl-sink"));
+
         let download = gst::ElementFactory::make("d3d11download", None)
             .map_err(|_| PlayerError::Backend("d3d11download creation failed".to_owned()))?;
 
         let vsinkbin = gst::ElementFactory::make("glsinkbin", Some("servo-media-vsink"))
             .map_err(|_| PlayerError::Backend("glsinkbin creation failed".to_owned()))?;
 
-        pipeline
-            .dynamic_cast_ref::<gst::Pipeline>()
-            .unwrap()
-            .add_many(&[&vsinkbin, &download])
-            .map_err(|e| PlayerError::Backend("Failed to add element".to_owned()))?;
-
-        pipeline
-            .set_property("video-sink", &download)
-            .expect("playbin doesn't have expected 'video-sink' property");
-
-        let intermediate_caps = gst::Caps::builder("video/x-raw")
-            .field("format", &gst_video::VideoFormat::Rgba.to_string())
-            .build();
-
-        download.link_filtered(&vsinkbin, Some(&intermediate_caps))
-            .expect("Failed to link d3d11download -> glsinkbin");
-
-        let caps = gst::Caps::builder("video/x-raw")
-            .features(&[&gst_gl::CAPS_FEATURE_MEMORY_GL_MEMORY])
-            .field("format", &gst_video::VideoFormat::Rgba.to_string())
-            .field("texture-target", &gst::List::new(&[&"2D", &"external-oes"]))
-            .build();
-        appsink
-            .set_property("caps", &caps)
-            .expect("appsink doesn't have expected 'caps' property");
-
         vsinkbin
             .set_property("sink", &appsink)
             .expect("glsinkbin doesn't have expected 'sink' property");
+
+        d3dglsink.add_many(&[&download, &vsinkbin])
+            .map_err(|e| PlayerError::Backend("Failed to add elements to d3dglsink".to_owned()))?;
+
+        download.link(&vsinkbin)
+            .expect("Failed to link d3d11download -> glsinkbin");
+
+        let video_pad = gst::GhostPad::new(Some("sink"), &download.get_static_pad("sink").unwrap()).unwrap();
+        d3dglsink.add_pad(&video_pad);
+
+        pipeline
+            .set_property("video-sink", &d3dglsink)
+            .expect("playbin doesn't have expected 'video-sink' property");
 
         let bus = pipeline.get_bus().expect("pipeline with no bus");
         let display_ = self.display.clone();
